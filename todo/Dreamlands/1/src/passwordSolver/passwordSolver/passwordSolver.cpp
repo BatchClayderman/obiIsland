@@ -26,8 +26,8 @@
 #endif
 #endif
 typedef unsigned short Count;
-constexpr size_t PASSWORD_LENGTH = 4;
-constexpr Count MAXIMUM_ATTEMPT_COUNT = 5;
+constexpr const size_t PASSWORD_LENGTH = 4;
+constexpr const Count MAXIMUM_ATTEMPT_COUNT = 5;
 
 
 enum class Symbol : unsigned char
@@ -104,16 +104,29 @@ public:
 	{
 		if (Status::Generated <= this->status && this->status <= Status::Solving && this->remainingAttemptCount >= 1 && submissions.size() == PASSWORD_LENGTH)
 		{
-			results = std::vector<Result>(PASSWORD_LENGTH, Result::Right);
-			bool flag = true;
+			results = std::vector<Result>(PASSWORD_LENGTH, Result::Incorrect);
+			Count rightPositionCount = 0;
+			std::vector<Symbol> remainingSymbols{};
 			for (size_t idx = 0; idx < PASSWORD_LENGTH; ++idx)
-				if (submissions[idx] != this->symbols[idx])
+				if (submissions[idx] == this->symbols[idx])
 				{
-					results[idx] = find(this->symbols.begin(), this->symbols.end(), submissions[idx]) == this->symbols.end() ? Result::Incorrect : Result::Misplaced;
-					flag = false;
+					results[idx] = Result::Right;
+					++rightPositionCount;
+				}
+				else
+					remainingSymbols.push_back(this->symbols[idx]);
+			for (size_t idx = 0; idx < PASSWORD_LENGTH; ++idx)
+				if (results[idx] != Result::Right)
+				{
+					std::vector<Symbol>::iterator it = std::find(remainingSymbols.begin(), remainingSymbols.end(), submissions[idx]);
+					if (it != remainingSymbols.end())
+					{
+						results[idx] = Result::Misplaced;
+						remainingSymbols.erase(it);
+					}
 				}
 			--this->remainingAttemptCount;
-			this->status = flag ? Status::Successful : (this->remainingAttemptCount < 1 ? Status::Failed : Status::Solving);
+			this->status = rightPositionCount >= PASSWORD_LENGTH ? Status::Successful : (this->remainingAttemptCount < 1 ? Status::Failed : Status::Solving);
 			s = this->status;
 			return true;
 		}
@@ -356,20 +369,20 @@ public:
 				case Status::Set:
 				case Status::Solving:
 				default:
-					for (size_t idx = 0; idx < 4; ++idx)
+					for (size_t idx = 0; idx < PASSWORD_LENGTH; ++idx)
 						switch (results[idx])
 						{
 						case Result::Right:
 							answers[idx] = std::vector<Symbol>{ submissions[idx] };
 							writingFlags[idx] = false;
 							++symbolTypeCount;
-							for (size_t secondaryIdx = 0; secondaryIdx < 4; ++secondaryIdx)
+							for (size_t secondaryIdx = 0; secondaryIdx < PASSWORD_LENGTH; ++secondaryIdx)
 								if (writingFlags[secondaryIdx])
 									answers[secondaryIdx].push_back(submissions[idx]);
 							break;
 						case Result::Misplaced:
 							++symbolTypeCount;
-							for (size_t secondaryIdx = 0; secondaryIdx < 4; ++secondaryIdx)
+							for (size_t secondaryIdx = 0; secondaryIdx < PASSWORD_LENGTH; ++secondaryIdx)
 								if (secondaryIdx != idx && writingFlags[secondaryIdx])
 									answers[secondaryIdx].push_back(submissions[idx]);
 							break;
@@ -382,7 +395,7 @@ public:
 			}
 			else
 				return false;
-			if (symbolTypeCount < 4)
+			if (symbolTypeCount < PASSWORD_LENGTH)
 			{
 #if defined _DEBUG || defined DEBUG
 				std::cout << Formatter::format(attemptCount, submissions, results, answers) << std::endl;
@@ -410,20 +423,20 @@ public:
 					case Status::Set:
 					case Status::Solving:
 					default:
-						for (size_t idx = 0; idx < 4; ++idx)
+						for (size_t idx = 0; idx < PASSWORD_LENGTH; ++idx)
 							switch (results[idx])
 							{
 							case Result::Right:
 								answers[idx] = std::vector<Symbol>{ submissions[idx] };
 								writingFlags[idx] = false;
 								++symbolTypeCount;
-								for (size_t secondaryIdx = 0; secondaryIdx < 4; ++secondaryIdx)
+								for (size_t secondaryIdx = 0; secondaryIdx < PASSWORD_LENGTH; ++secondaryIdx)
 									if (writingFlags[secondaryIdx])
 										answers[secondaryIdx].push_back(submissions[idx]);
 								break;
 							case Result::Misplaced:
 								++symbolTypeCount;
-								for (size_t secondaryIdx = 0; secondaryIdx < 4; ++secondaryIdx)
+								for (size_t secondaryIdx = 0; secondaryIdx < PASSWORD_LENGTH; ++secondaryIdx)
 									if (secondaryIdx != idx && writingFlags[secondaryIdx])
 										answers[secondaryIdx].push_back(submissions[idx]);
 								break;
@@ -470,22 +483,24 @@ public:
 					case Status::Set:
 					case Status::Solving:
 					default:
-						for (size_t idx = 0; idx < 4; ++idx)
+						for (size_t idx = 0; idx < PASSWORD_LENGTH; ++idx)
 							switch (results[idx])
 							{
 							case Result::Right:
 								answers[idx] = std::vector<Symbol>{ submissions[idx] };
 								break;
 							case Result::Misplaced:
-								if (find(answers[idx].begin(), answers[idx].end(), submissions[idx]) == answers[idx].end())
+							case Result::Incorrect:
+							{
+								std::vector<Symbol>::iterator it = std::find(answers[idx].begin(), answers[idx].end(), submissions[idx]);
+								if (answers[idx].end() == it)
 									return false;
 								else
-									answers[idx].erase(std::remove(answers[idx].begin(), answers[idx].end(), submissions[idx]), answers[idx].end());
+									answers[idx].erase(it);
 								break;
-							case Result::Incorrect:
-								return false;
+							}
 							default:
-								break;
+								return false;
 							}
 #if defined _DEBUG || defined DEBUG
 						std::cout << Formatter::format(attemptCount, submissions, results, answers) << std::endl;
@@ -548,7 +563,7 @@ int main(int argc, char* argv[])
 					++p;
 				x = strtoll(p, nullptr, 0);
 			}
-			groupCount = static_cast<Count>(x >= 4096 ? 4096 : (x <= 1 ? 1 : x));
+			groupCount = static_cast<Count>(x >= 4096 ? 4096U : (x <= 1 ? 1 : x));
 		}
 		else
 		{
@@ -646,7 +661,7 @@ int main(int argc, char* argv[])
 	}
 	else if (argc >= 5)
 	{
-		Count count = 4;
+		Count count = PASSWORD_LENGTH;
 		std::vector<std::vector<Symbol>> groups{};
 		for (int idx = 1; idx < argc; ++idx)
 			if ('0' <= argv[idx][0] && argv[idx][0] <= '7')

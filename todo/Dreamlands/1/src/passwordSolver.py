@@ -42,13 +42,19 @@ class Problem:
 		return self.__status
 	def submit(self:object, submissions:tuple|list) -> tuple:
 		if Status.Generated <= self.__status <= Status.Solving and self.__remainingAttemptCount >= 1 and isinstance(submissions, (tuple, list)) and len(submissions) == 4:
-			results, flag = [Result.Right] * 4, True
+			results, rightPositionCount, remainingSymbols = [Result.Incorrect] * 4, 0, []
 			for idx in range(4):
-				if submissions[idx] != self.__symbols[idx]:
-					results[idx] = Result.Misplaced if submissions[idx] in self.__symbols else Result.Incorrect
-					flag = False
+				if submissions[idx] == self.__symbols[idx]:
+					results[idx] = Result.Right
+					rightPositionCount += 1
+				else:
+					remainingSymbols.append(self.__symbols[idx])
+			for idx in range(4):
+				if results[idx] != Result.Right and submissions[idx] in remainingSymbols:
+					results[idx] = Result.Misplaced
+					remainingSymbols.remove(submissions[idx])
 			self.__remainingAttemptCount -= 1
-			self.__status = Status.Successful if flag else (Status.Failed if self.__remainingAttemptCount < 1 else Status.Solving)
+			self.__status = Status.Successful if rightPositionCount >= 4 else (Status.Failed if self.__remainingAttemptCount < 1 else Status.Solving)
 			return (True, self.__status, tuple(results))
 		else:
 			return (False, self.__status, None)
@@ -152,11 +158,8 @@ class Solver:
 						for idx in range(4):
 							if Result.Right == results[idx]:
 								answers[idx] = [submissions[idx]]
-							elif Result.Misplaced == results[idx]:
-								if submissions[idx] in answers[idx]:
-									answers[idx].remove(submissions[idx])
-								else:
-									return (False, attemptCount, None)
+							elif submissions[idx] in answers[idx]:
+								answers[idx].remove(submissions[idx])
 							else:
 								return (False, attemptCount, None)
 						if isPrint:
